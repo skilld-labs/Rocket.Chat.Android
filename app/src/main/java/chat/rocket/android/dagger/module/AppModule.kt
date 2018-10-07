@@ -53,6 +53,7 @@ import chat.rocket.android.server.infraestructure.SharedPrefsConnectingServerRep
 import chat.rocket.android.server.infraestructure.SharedPrefsCurrentServerRepository
 import chat.rocket.android.util.AppJsonAdapterFactory
 import chat.rocket.android.util.HttpLoggingInterceptor
+import chat.rocket.android.util.BasicAuthenticatorInterceptor
 import chat.rocket.android.util.TimberLogger
 import chat.rocket.common.internal.FallbackSealedClassJsonAdapter
 import chat.rocket.common.internal.ISO8601Date
@@ -106,9 +107,16 @@ class AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(logger: HttpLoggingInterceptor): OkHttpClient {
+    fun provideBasicAuthenticatorInterceptor(): BasicAuthenticatorInterceptor {
+        return BasicAuthenticatorInterceptor()
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(logger: HttpLoggingInterceptor, basicAuthenticator: BasicAuthenticatorInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(logger)
+            .addInterceptor(basicAuthenticator)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
