@@ -6,9 +6,11 @@ import okhttp3.Response
 import okhttp3.Credentials
 import java.io.IOException
 import timber.log.Timber
-
-import chat.rocket.android.server.domain.SaveBasicAuthInteractor
+import chat.rocket.android.server.domain.model.BasicAuth
 import chat.rocket.android.server.domain.GetBasicAuthInteractor
+import chat.rocket.android.server.domain.SaveBasicAuthInteractor
+
+import javax.inject.Inject
 
 /**
  * An OkHttp interceptor which adds Authorization header based on URI userInfo
@@ -16,26 +18,34 @@ import chat.rocket.android.server.domain.GetBasicAuthInteractor
  * [application interceptor][OkHttpClient.interceptors]
  * or as a [ ][OkHttpClient.networkInterceptors].
  */
-class BasicAuthenticatorInterceptor : Interceptor {
+class BasicAuthenticatorInterceptor @Inject constructor (
+    private val getBasicAuthInteractor: GetBasicAuthInteractor,
+    private val saveBasicAuthInteractor: SaveBasicAuthInteractor
+): Interceptor {
     private val credentials = HashMap<String, String>()
     
-    private var saveBasicAuthInteractor: SaveBasicAuthInteractor
-    private var getBasicAuthInteractor: GetBasicAuthInteractor
-
     @Throws(IOException::class)
     override fun intercept(chain: Interceptor.Chain): Response {
-        Timber.d("INTERCEPT BASIC AUTH")
         var request = chain.request()
         val url = request.url()
-        val username = url.username()
-        getBasicAuthInteractor.get()?.let {
-            Timber.d("BASIC AUTH REPO GOT THIS ${it}")
-        } ?: run {
-            Timber.d("We will store this data ${username}")
-            saveBasicAuthInteractor.save(username)
+        val server = url.host()
+        var username = url.username()
+        var password = url.password()
+
+        getBasicAuthInteractor.get(server.toString())?.let {
+            username = it.userName
+            password = it.password
+        } ?: run {            
+            val credentials = BasicAuth(
+                server,
+                username,
+                password
+            )
+            saveBasicAuthInteractor.save(credentials)
         }
+
         if (!username.isNullOrEmpty()) {
-            credentials[url.host()] = Credentials.basic(username, url.password())
+            credentials[url.host()] = Credentials.basic(username, password)
             request = request.newBuilder().url(
                 url.newBuilder().username("").password("").build()
             ).build()

@@ -40,6 +40,10 @@ import chat.rocket.android.server.domain.PermissionsRepository
 import chat.rocket.android.server.domain.SettingsRepository
 import chat.rocket.android.server.domain.TokenRepository
 import chat.rocket.android.server.domain.UsersRepository
+import chat.rocket.android.server.domain.BasicAuthRepository
+import chat.rocket.android.server.domain.GetBasicAuthInteractor
+import chat.rocket.android.server.domain.SaveBasicAuthInteractor
+import chat.rocket.android.server.infraestructure.SharedPrefsBasicAuthRepository
 import chat.rocket.android.server.infraestructure.DatabaseMessageMapper
 import chat.rocket.android.server.infraestructure.DatabaseMessagesRepository
 import chat.rocket.android.server.infraestructure.JobSchedulerInteractorImpl
@@ -107,8 +111,14 @@ class AppModule {
 
     @Provides
     @Singleton
-    fun provideBasicAuthenticatorInterceptor(): BasicAuthenticatorInterceptor {
-        return BasicAuthenticatorInterceptor()
+    fun provideBasicAuthenticatorInterceptor(
+        getBasicAuthInteractor: GetBasicAuthInteractor,
+        saveBasicAuthInteractor: SaveBasicAuthInteractor
+    ): BasicAuthenticatorInterceptor {
+        return BasicAuthenticatorInterceptor(
+            getBasicAuthInteractor,
+            saveBasicAuthInteractor
+        )
     }
 
     @Provides
@@ -280,6 +290,14 @@ class AppModule {
         val url = serverInteractor.get()!!
         return MessageParser(context, configuration, settingsInteractor.get(url))
     }
+
+    @Provides
+    @Singleton
+    fun provideBasicAuthRepository (
+        preferences: SharedPreferences,
+        moshi: Moshi
+    ): BasicAuthRepository = 
+        SharedPrefsBasicAuthRepository(preferences, moshi)
 
     @Provides
     @Singleton
