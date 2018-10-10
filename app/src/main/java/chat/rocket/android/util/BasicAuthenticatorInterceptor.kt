@@ -22,37 +22,46 @@ class BasicAuthenticatorInterceptor @Inject constructor (
     private val getBasicAuthInteractor: GetBasicAuthInteractor,
     private val saveBasicAuthInteractor: SaveBasicAuthInteractor
 ): Interceptor {
-    private val credentials = HashMap<String, String>()
-    
+    private val credentialsHash = HashMap<String, String>()
+
+    private fun saveCredentials(server: String, basicCredentials: String) {
+        saveBasicAuthInteractor.save(
+            BasicAuth(
+                server,
+                basicCredentials
+            )
+        )
+    }
+
+    private fun buildHash(server: String, basicCredentials: String) {
+        credentialsHash[server] = basicCredentials
+    }
+
     @Throws(IOException::class)
     override fun intercept(chain: Interceptor.Chain): Response {
         var request = chain.request()
         val url = request.url()
         val server = url.host()
         var username = url.username()
-        var password = url.password()
-
-        getBasicAuthInteractor.get(server.toString())?.let {
-            username = it.userName
-            password = it.password
-        } ?: run {            
-            val credentials = BasicAuth(
-                server,
-                username,
-                password
-            )
-            saveBasicAuthInteractor.save(credentials)
-        }
 
         if (!username.isNullOrEmpty()) {
-            credentials[url.host()] = Credentials.basic(username, password)
+            val credentialsBasic = Credentials.basic(username, url.password())
+            saveCredentials(server, credentialsBasic)
+            buildHash(server, credentialsBasic)
             request = request.newBuilder().url(
                 url.newBuilder().username("").password("").build()
             ).build()
         }
-        credentials[url.host()]?.let {
+
+        credentialsHash[server]?.let {
             request = request.newBuilder().header("Authorization", it).build()
+        } ?: run {
+            getBasicAuthInteractor.get(server.toString())?.let {
+                buildHash(server, it.credentialsBasic)
+                request = request.newBuilder().header("Authorization", it.credentialsBasic).build()
+            }
         }
+
         return chain.proceed(request)
     }
 }
